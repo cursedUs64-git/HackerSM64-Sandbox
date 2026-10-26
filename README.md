@@ -1,3 +1,11 @@
+# HackerSM64-Sandbox Painting System
+
+## Credits:
+
+AmitabhTechz (cursedUs64-git, me): Painting warping, camera fixes
+B3313's TrollEngine: Painting optimisations, collision tester
+Megamanxzero300: Paintings creator tool
+
 # ![](https://i.imgur.com/CeOukzk.gif) HackerSM64 ![](https://i.imgur.com/s0LUbTo.gif)
 
 HackerSM64 is a commonly used base repository for Super Mario 64 ROM hacking projects. It includes many useful features for ROM hackers, improvements that are commonly applied in ROM hacks, software optimizations, and bug fixes for some gameplay annoyances.
