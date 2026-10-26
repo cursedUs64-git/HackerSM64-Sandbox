@@ -197,4 +197,6 @@ void play_transition(s16 transType, s16 time, u8 red, u8 green, u8 blue);
 void play_transition_after_delay(s16 transType, s16 time, u8 red, u8 green, u8 blue, s16 delay);
 void render_game(void);
 
+s32 area_table_search(u8 *romStart, u8 *romEnd, u32 recordSize, void *buf);
+
 #endif // AREA_H
