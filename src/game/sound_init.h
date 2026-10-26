@@ -17,6 +17,8 @@ enum SoundMenuFlags {
     SOUND_MENU_FLAG_EXTRA           = (1 << 8), // 0x100
 };
 
+extern s8 sPaintingEjectSoundPlayed;
+
 void reset_volume(void);
 void raise_background_noise(s32 a);
 void lower_background_noise(s32 a);

@@ -4833,6 +4833,18 @@ u8 open_door_cutscene(u8 pullResult, u8 pushResult) {
 u8 get_cutscene_from_mario_status(struct Camera *c) {
     u8 cutscene = c->cutscene;
 
+    // Fix a bug where painting cutscene doesn't play after post-exit save dialog's camera.
+    // Mario walks into a painting while the exit cutscene is still playing
+    // Cut it short and start the enter cutscene instead.
+    if ((cutscene == CUTSCENE_EXIT_PAINTING_SUCC || cutscene == CUTSCENE_DEATH_EXIT)
+	    && (sMarioCamState->action & ACT_GROUP_MASK) != ACT_GROUP_CUTSCENE
+	    && IS_PAINTING()) {
+	sCutsceneShot = 0;
+	gCutsceneTimer = 0;
+	c->doorStatus = DOOR_DEFAULT;
+	return CUTSCENE_ENTER_PAINTING;
+    }
+
     if (cutscene == CUTSCENE_NONE) {
         // A cutscene started by an object, if any, will start if nothing else happened
         cutscene = sObjectCutscene;
@@ -9606,10 +9618,11 @@ void cutscene_enter_painting_stub(UNUSED struct Camera *c) {
  * zooms in until the star select screen appears.
  */
 void cutscene_enter_painting(struct Camera *c) {
-    struct Surface *floor, *highFloor;
+    struct Surface *highFloor, *highCeil;
+    struct WallCollisionData wallData;
     Vec3f paintingPos, focus, focusOffset;
     Vec3s paintingAngle;
-    f32 floorHeight;
+    f32 floorHeight, ceilHeight;
 
     cutscene_event(cutscene_enter_painting_stub, c, 0, 0);
     // Zoom in
@@ -9639,15 +9652,37 @@ void cutscene_enter_painting(struct Camera *c) {
             focus[1] = floorHeight;
         }
 
+        // Clamp against the ceiling too, so a short room doesn't let the camera poke through it.
+        ceilHeight = find_ceil(focus[0], focus[1] - 500.f, focus[2], &highCeil) - 125.f;
+
+        if (highCeil != NULL && focus[1] > ceilHeight) {
+            focus[1] = ceilHeight;
+        }
+
+        // If the wall opposite the painting is too close, abort the cutscene entirely instead
+        // of letting the camera get shoved into or through it.
+        wallData.x = focus[0];
+        wallData.y = focus[1];
+        wallData.z = focus[2];
+        wallData.offsetY = 50.f;
+        wallData.radius = 150.f;
+        wallData.numWalls = 0;
+
+        if (find_wall_collisions(&wallData) != 0) {
+            c->cutscene = 0;
+            gCutsceneTimer = CUTSCENE_STOP;
+            sStatusFlags |= CAM_FLAG_SMOOTH_MOVEMENT;
+            c->mode = CAMERA_MODE_CLOSE;
+            return;
+        }
+
         if (c->cutscene == CUTSCENE_ENTER_PAINTING) {
             approach_vec3f_asymptotic(c->pos, focus, 0.2f, 0.1f, 0.2f);
         } else {
             approach_vec3f_asymptotic(c->pos, focus, 0.9f, 0.9f, 0.9f);
         }
 
-        find_floor(sMarioCamState->pos[0], sMarioCamState->pos[1] + 50.f, sMarioCamState->pos[2], &floor);
-
-        if ((floor->type < SURFACE_PAINTING_WOBBLE_A6) || (floor->type > SURFACE_PAINTING_WARP_F9)) {
+        if (!(gRipplingPainting->currFloor & (ENTER_LEFT | ENTER_MIDDLE | ENTER_RIGHT))) {
             c->cutscene = 0;
             gCutsceneTimer = CUTSCENE_STOP;
             sStatusFlags |= CAM_FLAG_SMOOTH_MOVEMENT;

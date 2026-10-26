@@ -28,6 +28,7 @@
 #include "object_fields.h"
 #include "object_helpers.h"
 #include "object_list_processor.h"
+#include "level_update.h"
 #include "print.h"
 #include "puppyprint.h"
 #include "save_file.h"

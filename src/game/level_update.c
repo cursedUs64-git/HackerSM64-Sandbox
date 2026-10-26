@@ -462,6 +462,8 @@ void warp_area(void) {
             load_area(sWarpDest.areaIdx);
         }
 
+	gCurrentPaintingGroup = get_current_painting_group();
+	reset_all_paintings();
         init_mario_after_warp();
     }
 }
@@ -473,6 +475,9 @@ void warp_level(void) {
     level_control_timer(TIMER_CONTROL_HIDE);
 
     load_area(sWarpDest.areaIdx);
+
+    gCurrentPaintingGroup = get_current_painting_group();
+    reset_all_paintings();
     init_mario_after_warp();
 }
 
@@ -647,27 +652,74 @@ void initiate_warp(s16 destLevel, s16 destArea, s16 destWarpNode, s32 warpFlags)
 #endif
 }
 
-// From Surface 0xD3 to 0xFC
-#define PAINTING_WARP_INDEX_START 0x00 // Value greater than or equal to Surface 0xD3
-#define PAINTING_WARP_INDEX_FA 0x2A    // THI Huge Painting index left
-#define PAINTING_WARP_INDEX_END 0x2D   // Value less than Surface 0xFD
-
 /**
- * Check if Mario is above and close to a painting warp floor, and return the
- * corresponding warp node.
+ * Returns the index in the current painting group of the painting that is both
+ * currently being entered as well as rippling, or -1 if there is none
+ * or the painting group is NULL.
  */
-struct WarpNode *get_painting_warp_node(void) {
-    struct WarpNode *warpNode = NULL;
-    s32 paintingIndex = gMarioState->floor->type - SURFACE_PAINTING_WARP_D3;
+static s32 get_entered_painting_index(void) {
+    s32 i;
 
-    if (paintingIndex >= PAINTING_WARP_INDEX_START && paintingIndex < PAINTING_WARP_INDEX_END) {
-        if (paintingIndex < PAINTING_WARP_INDEX_FA
-            || gMarioState->pos[1] - gMarioState->floorHeight < 80.0f) {
-            warpNode = &gCurrentArea->paintingWarpNodes[paintingIndex];
-        }
+    if (gCurrentPaintingGroup == NULL || gRipplingPainting == NULL) {
+        return -1;
     }
 
-    return warpNode;
+    for (i = 0; gCurrentPaintingGroup[i] != NULL; i++) {
+        struct Painting *painting = segmented_to_virtual(gCurrentPaintingGroup[i]);
+
+        if (painting == gRipplingPainting
+            && (painting->floorEntered & (ENTER_LEFT | ENTER_MIDDLE | ENTER_RIGHT))) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/**
+ * Returns the painting that is both currently being entered as well as rippling,
+ * for the current area's painting group,
+ * else returns NULL if there's no rippling painting or the painting group is NULL.
+ */
+struct Painting *get_entered_painting(void) {
+    s32 i = get_entered_painting_index();
+
+    return (i >= 0) ? segmented_to_virtual(gCurrentPaintingGroup[i]) : NULL;
+}
+
+/**
+ * Check if a painting is rippling and entered, and return the warp node of
+ * the corresponding painting according to the area painting array index.
+ */
+struct WarpNode *get_painting_warp_node(void) {
+    s32 i = get_entered_painting_index();
+
+    if (i < 0 || gCurrentArea->paintingWarpNodes == NULL) {
+        return NULL;
+    }
+    return &gCurrentArea->paintingWarpNodes[i];
+}
+
+/**
+ * TRUE if Mario is entering a painting that has a defined warp node.
+ */
+s32 is_painting_with_warp_node(void) {
+    struct WarpNode *node = get_painting_warp_node();
+
+    return node != NULL && node->id != 0;
+}
+
+/*
+ * Get the current area's painting group, and reset each painting
+ * in that group.
+ */
+void reset_all_paintings(void) {
+    if (gCurrentPaintingGroup != NULL) {
+        s8 i = 0;
+        while (gCurrentPaintingGroup[i] != NULL) {
+            reset_painting(segmented_to_virtual(gCurrentPaintingGroup[i]));
+            i++;
+        }
+    }
 }
 
 /**
