@@ -18,6 +18,7 @@
 #include "paintings.h"
 #include "save_file.h"
 #include "segment2.h"
+#include "tables/painting_array_table.h"
 
 /**
  * @file paintings.c
@@ -76,21 +77,6 @@
  * Triggers a passive ripple on the right side of the painting.
  */
 #define RIPPLE_RIGHT 0x8
-
-/**
- * Triggers an entry ripple on the left side of the painting.
- */
-#define ENTER_LEFT 0x4
-
-/**
- * Triggers an entry ripple in the middle of the painting.
- */
-#define ENTER_MIDDLE 0x2
-
-/**
- * Triggers an entry ripple on the right side of the painting.
- */
-#define ENTER_RIGHT 0x1
 
 /**
  * Use the 1/4th part of the painting that is nearest to Mario's current floor.
@@ -161,35 +147,39 @@ Vec3f *gPaintingTriNorms;
  */
 struct Painting *gRipplingPainting;
 
-/**
- * Whether the DDD painting is moved forward, should being moving backwards, or has already moved backwards.
- */
-s8 gDddPaintingStatus;
-
-struct Painting *sHmcPaintings[] = {
-    &cotmc_painting,
-    NULL,
-};
-
-struct Painting *sInsideCastlePaintings[] = {
-    &bob_painting, &ccm_painting, &wf_painting,  &jrb_painting,      &lll_painting,
-    &ssl_painting, &hmc_painting, &ddd_painting, &wdw_painting,      &thi_tiny_painting,
-    &ttm_painting, &ttc_painting, &sl_painting,  &thi_huge_painting, NULL,
-};
-
-struct Painting *sTtmPaintings[] = {
-    &ttm_slide_painting,
-    NULL,
-};
-
-struct Painting **sPaintingGroups[] = {
-    sHmcPaintings,
-    sInsideCastlePaintings,
-    sTtmPaintings,
-};
-
 s16 gPaintingUpdateCounter = 1;
 s16 gLastPaintingUpdateCounter = 0;
+
+static s16 sLastLevel = -1;
+static s16 sLastArea  = -1;
+struct Painting **gCurrentPaintingGroup = NULL;
+
+ALIGNED16 static struct PaintingGroup sPaintingGroupBuf;
+
+/**
+ * Check for a matching painting key by using the current (level, area),
+ * using a binary search over ROM. If found, return the group.
+ */
+static struct Painting **find_painting_group(void) {
+    if (area_table_search(_painting_tableSegmentRomStart, _painting_tableSegmentRomEnd,
+                          PAINTING_GROUP_RECORD_SIZE, &sPaintingGroupBuf)) {
+        return sPaintingGroupBuf.paintings;
+    }
+    return NULL;
+}
+
+/**
+ * Set sLastLevel/Area to the current one,
+ * find the painting group for current (level, area) via
+ * find_painting_group().
+ */
+struct Painting **get_current_painting_group(void) {
+    if (sLastLevel != gCurrLevelNum || sLastArea != gCurrAreaIndex) {
+        sLastLevel = gCurrLevelNum;
+        sLastArea  = gCurrAreaIndex;
+    }
+    return find_painting_group();
+}
 
 /**
  * Stop paintings in paintingGroup from rippling if their id is different from *idptr.
@@ -1071,66 +1061,8 @@ void reset_painting(struct Painting *painting) {
     painting->rippleTimer = 0.0f;
     painting->rippleX = 0.0f;
     painting->rippleY = 0.0f;
-    if (painting == &ddd_painting) {
-        // Move DDD painting to initial position, in case the animation
-        // that moves the painting stops during level unload.
-        painting->posX = 3456.0f;
-    }
 #endif
 }
-
-/**
- * Controls the x coordinate of the DDD painting.
- *
- * Before Mario gets the "Board Bowser's Sub" star in DDD, the painting spawns at frontPos.
- *
- * If Mario just got the star, the painting's x coordinate moves to backPos at a rate of `speed` units.
- *
- * When the painting reaches backPos, a save flag is set so that the painting will spawn at backPos
- * whenever it loads.
- *
- * This function also sets gDddPaintingStatus, which controls the warp:
- *  0 (0b00): set x coordinate to frontPos
- *  2 (0b10): set x coordinate to backPos
- *  3 (0b11): same as 2. Bit 0 is ignored
- */
-#ifdef UNLOCK_ALL
-void move_ddd_painting(struct Painting *painting, UNUSED f32 frontPos, f32 backPos, UNUSED f32 speed) {
-    painting->posX = backPos;
-    gDddPaintingStatus = (DDD_FLAG_BOWSERS_SUB_BEATEN | DDD_FLAG_BACK);
-}
-#else
-void move_ddd_painting(struct Painting *painting, f32 frontPos, f32 backPos, f32 speed) {
-    // Obtain the DDD star flags
-    u32 dddFlags = save_file_get_star_flags(gCurrSaveFileNum - 1, COURSE_NUM_TO_INDEX(COURSE_DDD));
-    // Get the other save file flags
-    u32 saveFileFlags = save_file_get_flags();
-    // Find out whether Board Bowser's Sub was collected
-    u32 bowsersSubBeaten = dddFlags & BOARD_BOWSERS_SUB;
-    // Check whether DDD has already moved back
-    u32 dddBack = saveFileFlags & SAVE_FLAG_DDD_MOVED_BACK;
-
-    if (!bowsersSubBeaten && !dddBack) {
-        // If we haven't collected the star or moved the painting, put the painting at the front
-        painting->posX = frontPos;
-        gDddPaintingStatus = DDD_FLAGS_NONE;
-    } else if (bowsersSubBeaten && !dddBack) {
-        // If we've collected the star but not moved the painting back,
-        // Each frame, move the painting by a certain speed towards the back area.
-        painting->posX += speed;
-        gDddPaintingStatus = DDD_FLAG_BOWSERS_SUB_BEATEN;
-        if (painting->posX >= backPos) {
-            painting->posX = backPos;
-            // Tell the save file that we've moved DDD back.
-            save_file_set_flags(SAVE_FLAG_DDD_MOVED_BACK);
-        }
-    } else if (bowsersSubBeaten && dddBack) {
-        // If the painting has already moved back, place it in the back position.
-        painting->posX = backPos;
-        gDddPaintingStatus = (DDD_FLAG_BOWSERS_SUB_BEATEN | DDD_FLAG_BACK);
-    }
-}
-#endif
 
 /**
  * Set the painting's node's layer based on its alpha
@@ -1226,12 +1158,6 @@ Gfx *geo_painting_draw(s32 callContext, struct GraphNode *node, UNUSED void *con
     if (callContext != GEO_CONTEXT_RENDER) {
         reset_painting(painting);
     } else if (callContext == GEO_CONTEXT_RENDER) {
-
-        // Update the ddd painting before drawing
-        if (group == 1 && id == PAINTING_ID_DDD) {
-            move_ddd_painting(painting, 3456.0f, 5529.6f, 20.0f);
-        }
-
         // Determine if the painting is transparent
         set_painting_layer(gen, painting);
 

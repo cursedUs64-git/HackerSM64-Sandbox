@@ -17,6 +17,21 @@
 
 #define BOARD_BOWSERS_SUB (1 << 0)
 
+/**
+ * Triggers an entry ripple on the left side of the painting.
+ */
+#define ENTER_LEFT 0x4
+
+/**
+ * Triggers an entry ripple in the middle of the painting.
+ */
+#define ENTER_MIDDLE 0x2
+
+/**
+ * Triggers an entry ripple on the right side of the painting.
+ */
+#define ENTER_RIGHT 0x1
+
 enum DDDPaintingFlags {
     DDD_FLAGS_NONE              = (0 << 0), // 0x0
     DDD_FLAG_BACK               = (1 << 0), // 0x1
@@ -136,8 +151,10 @@ struct PaintingMeshVertex {
 extern struct PaintingMeshVertex *gPaintingMesh;
 extern Vec3f *gPaintingTriNorms;
 extern struct Painting *gRipplingPainting;
-extern s8 gDddPaintingStatus;
+extern struct Painting **gCurrentPaintingGroup;
 
+struct Painting **get_current_painting_group(void);
+void reset_painting(struct Painting *painting);
 Gfx *geo_painting_draw(s32 callContext, struct GraphNode *node, UNUSED void *context);
 Gfx *geo_painting_update(s32 callContext, UNUSED struct GraphNode *node, UNUSED Mat4 mtx);
 
