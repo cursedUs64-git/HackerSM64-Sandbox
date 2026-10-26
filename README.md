@@ -3,8 +3,12 @@
 ## Credits:
 
 AmitabhTechz (cursedUs64-git, me): Painting warping, camera fixes
+
 B3313's TrollEngine: Painting optimisations, collision tester
+
 Megamanxzero300: Paintings creator tool
+
+# CREDIT NEEDED!
 
 # ![](https://i.imgur.com/CeOukzk.gif) HackerSM64 ![](https://i.imgur.com/s0LUbTo.gif)
 
