@@ -31,6 +31,7 @@
 #include "rumble_init.h"
 #include "puppycam2.h"
 #include "puppyprint.h"
+#include "paintings.h"
 #include "level_commands.h"
 #include "debug.h"
 

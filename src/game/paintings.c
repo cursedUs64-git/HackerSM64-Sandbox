@@ -18,6 +18,7 @@
 #include "paintings.h"
 #include "save_file.h"
 #include "segment2.h"
+#include "sound_init.h"
 #include "tables/painting_array_table.h"
 
 /**
