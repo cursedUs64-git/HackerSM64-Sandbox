@@ -522,6 +522,12 @@ SECTIONS
       KEEP(BUILD_DIR/sound/sound_data.o(.data*));
    }
    END_SEG(assets)
+
+   BEGIN_SEG(painting_table, __romPos)
+   {
+       KEEP(BUILD_DIR/src/tables/painting_array_table.o(.painting_table));
+   }
+   END_SEG(painting_table)
 #ifdef HVQM
    BEGIN_SEG(capcom, __romPos) SUBALIGN(2)
    {

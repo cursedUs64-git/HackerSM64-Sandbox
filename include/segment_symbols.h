@@ -50,6 +50,7 @@ DECLARE_SEGMENT(scripts)
 DECLARE_SEGMENT(goddard)
 DECLARE_SEGMENT(framebuffers)
 DECLARE_SEGMENT(assets)
+DECLARE_SEGMENT(painting_table)
 extern u8 _goddardSegmentStart[];
 extern u8 _goddardSegmentTextEnd[];
 extern u8 _goddardSegmentEnd[];
