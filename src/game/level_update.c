@@ -463,8 +463,6 @@ void warp_area(void) {
             load_area(sWarpDest.areaIdx);
         }
 
-	gCurrentPaintingGroup = get_current_painting_group();
-	reset_all_paintings();
         init_mario_after_warp();
     }
 }
@@ -477,8 +475,6 @@ void warp_level(void) {
 
     load_area(sWarpDest.areaIdx);
 
-    gCurrentPaintingGroup = get_current_painting_group();
-    reset_all_paintings();
     init_mario_after_warp();
 }
 

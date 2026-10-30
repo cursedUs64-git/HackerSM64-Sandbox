@@ -18,6 +18,7 @@
 #include "area.h"
 #include "rendering_graph_node.h"
 #include "level_update.h"
+#include "paintings.h"
 #include "engine/geo_layout.h"
 #include "save_file.h"
 #include "level_table.h"
@@ -253,11 +254,15 @@ void load_area(s32 index) {
         }
 
         geo_call_global_function_nodes(&gCurrentArea->graphNode->node, GEO_CONTEXT_AREA_LOAD);
+
+        gCurrentPaintingGroup = get_current_painting_group();
+        reset_all_paintings();
     }
 }
 
 void unload_area(void) {
     if (gCurrentArea != NULL) {
+        reset_all_paintings();
         unload_objects_from_area(0, gCurrentArea->index);
         geo_call_global_function_nodes(&gCurrentArea->graphNode->node, GEO_CONTEXT_AREA_UNLOAD);
 

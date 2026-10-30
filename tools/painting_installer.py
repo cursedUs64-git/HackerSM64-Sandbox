@@ -421,7 +421,7 @@ def get_level_values(root: Path) -> dict[str, int]:
 
 
 def get_painting_group_max(root: Path) -> int:
-    text = read_text(root / "src" / "game" / "painting_array_table.h")
+    text = read_text(root / "src" / "tables" / "painting_array_table.h")
     m = re.search(r"(?m)^\s*#define\s+PAINTING_GROUP_MAX\s+(\d+)\b", text)
     if not m:
         die("could not find PAINTING_GROUP_MAX in painting_array_table.h.")
@@ -949,7 +949,7 @@ def main(argv: list[str] | None = None) -> int:
         texture_req = args.texture or f"{args.name}.rgba16.png"
         _texture_src, texture = resolve_texture(level_dir, texture_req, 32, 32, warnings)
 
-    table_path = root / "src" / "game" / "painting_array_table.c"
+    table_path = root / "src" / "tables" / "painting_array_table.c"
     table_old = read_text(table_path)
     level_values = get_level_values(root)
     group_max = get_painting_group_max(root)

@@ -536,13 +536,13 @@ void painting_collision(struct Painting *painting) {
     s8 ripple = 0;
     s32 positionShift;
     Vec3f rel;
-    f32 yaw, c, s, tmp;
+    f32 yaw, pitch, cy, sy, cp, sp, tmp;
 
-    // convert the yaw to radians and get rot components,
-    // get the painting's orientation as a 2d rot matrix
+    // convert the yaw and pitch to radians and get rot components,
+    // get the painting's orientation as a 3d rot matrix
     yaw = -(f32)painting->yaw / 57.29577951308232f;
-    c = cosf(yaw);
-    s = sin_from_cos(yaw, c);
+    cy = cosf(yaw);
+    sy = sin_from_cos(yaw, cy);
 
     // mario's pos relative to the painting's origin
     rel[0] = gPaintingMarioXPos - painting->posX;
@@ -554,8 +554,16 @@ void painting_collision(struct Painting *painting) {
     // rel[1] is up-down,
     // rel[2] is depth (negative = in front).
     tmp    = rel[0];
-    rel[0] = c * rel[0] + s * rel[2];
-    rel[2] = -s * tmp   + c * rel[2];
+    rel[0] = cy * rel[0] + sy * rel[2];
+    rel[2] = -sy * tmp   + cy * rel[2];
+
+    pitch = -(f32)painting->pitch / 57.29577951308232f;
+    cp = cosf(pitch);
+    sp = sin_from_cos(pitch, cp);
+
+    tmp    = rel[1];
+    rel[1] = cp * rel[1] - sp * rel[2];
+    rel[2] = sp * tmp   + cp * rel[2];
 
     // mario is horizontally within the painting width, and not too far in the front.
     if (rel[0] > 0.0f && rel[0] < painting->size && rel[2] > -150.0f) {
@@ -958,7 +966,12 @@ Gfx *painting_ripple_image(struct Painting *painting) {
         return dlist;
     }
 
-    gSPDisplayList(gfx++, painting_model_view_transform(painting));
+    Gfx *mtxDl = painting_model_view_transform(painting);
+    if (mtxDl == NULL) {
+        return NULL;
+    }
+
+    gSPDisplayList(gfx++, mtxDl);
     gSPDisplayList(gfx++, dl_paintings_rippling_begin);
     gSPDisplayList(gfx++, painting->rippleDisplayList);
 
@@ -997,7 +1010,12 @@ Gfx *painting_ripple_env_mapped(struct Painting *painting) {
         return dlist;
     }
 
-    gSPDisplayList(gfx++, painting_model_view_transform(painting));
+    Gfx *mtxDl = painting_model_view_transform(painting);
+    if (mtxDl == NULL) {
+        return NULL;
+    }
+
+    gSPDisplayList(gfx++, mtxDl);
     gSPDisplayList(gfx++, dl_paintings_env_mapped_begin);
     gSPDisplayList(gfx++, painting->rippleDisplayList);
 
@@ -1052,27 +1070,44 @@ Gfx *display_painting_rippling(struct Painting *painting) {
  * Render a normal painting.
  */
 Gfx *display_painting_not_rippling(struct Painting *painting) {
-    Texture **textures = segmented_to_virtual(painting->textureArray);
-    register Gfx *dlist;
-    dlist = alloc_display_list(16 * sizeof(Gfx));
-    register Gfx *gfx = dlist;
+    Texture **textures;
+    Gfx *dlist;
+    Gfx *gfx;
+    s16 tWidth;
+    s16 tHeight;
 
     // this expects a painting with two image halves, bottom and top respectively.
-    if (dlist != NULL && painting->imageCount == 2) {
-        gSPDisplayList(gfx++, segmented_to_virtual(painting->normalDisplayList));
-        gDPSetTextureImage(gfx++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, segmented_to_virtual(textures[0])); // textures[0] is lower texture
-        gDPLoadSync(gfx++);
-        gDPLoadBlock(gfx++, G_TX_LOADTILE, 0, 0, 64 * 32 - 1, CALC_DXT(64, G_IM_SIZ_16b_BYTES));
-        gSP2Triangles(gfx++, 0,  1,  2, 0x0,  0,  2,  3, 0x0);
-        gDPSetTextureImage(gfx++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, segmented_to_virtual(textures[1])); // textures[1] is upper texture
-        gDPLoadSync(gfx++);
-        gDPLoadBlock(gfx++, G_TX_LOADTILE, 0, 0, 64 * 32 - 1, CALC_DXT(64, G_IM_SIZ_16b_BYTES));
-        gSP2Triangles(gfx++, 4,  5,  6, 0x0,  4,  6,  7, 0x0);
-        gSPTexture(gfx++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_OFF);
-        gDPPipeSync(gfx++);
-        gDPSetCombineMode(gfx++, G_CC_SHADE, G_CC_SHADE);
-        gSPEndDisplayList(gfx++);
+    if (painting->imageCount != 2) {
+        return NULL;
     }
+
+    textures = segmented_to_virtual(painting->textureArray);
+    if (textures == NULL) {
+        return NULL;
+    }
+
+    dlist = alloc_display_list(16 * sizeof(Gfx));
+    if (dlist == NULL) {
+        return NULL;
+    }
+    gfx = dlist;
+
+    tWidth = painting->textureWidth;
+    tHeight = painting->textureHeight;
+
+    gSPDisplayList(gfx++, segmented_to_virtual(painting->normalDisplayList));
+    gDPSetTextureImage(gfx++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, segmented_to_virtual(textures[0])); // textures[0] is lower texture
+    gDPLoadSync(gfx++);
+    gDPLoadBlock(gfx++, G_TX_LOADTILE, 0, 0, tWidth * tHeight - 1, CALC_DXT(tWidth, G_IM_SIZ_16b_BYTES));
+    gSP2Triangles(gfx++, 0,  1,  2, 0x0,  0,  2,  3, 0x0);
+    gDPSetTextureImage(gfx++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, segmented_to_virtual(textures[1])); // textures[1] is upper texture
+    gDPLoadSync(gfx++);
+    gDPLoadBlock(gfx++, G_TX_LOADTILE, 0, 0, tWidth * tHeight - 1, CALC_DXT(tWidth, G_IM_SIZ_16b_BYTES));
+    gSP2Triangles(gfx++, 4,  5,  6, 0x0,  4,  6,  7, 0x0);
+    gSPTexture(gfx++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_OFF);
+    gDPPipeSync(gfx++);
+    gDPSetCombineMode(gfx++, G_CC_SHADE, G_CC_SHADE);
+    gSPEndDisplayList(gfx++);
 
     return dlist;
 }
@@ -1130,17 +1165,24 @@ Gfx *display_painting(struct Painting *painting) {
         // the vanilla one requires an identical display list for each painting
         // which intensely wastes space
         Gfx *dlist = alloc_display_list(4 * sizeof(Gfx));
+        Gfx *mtxDl;
+        Gfx *paintDl;
+        Gfx *gfx;
 
-        Gfx *mtxDl = painting_model_view_transform(painting);
-        Gfx *paintDl = display_painting_not_rippling(painting);
+        if (dlist == NULL) {
+            return NULL;
+        }
 
-        if (dlist != NULL && mtxDl != NULL && paintDl != NULL) {
-            Gfx *gfx = dlist;
+        mtxDl = painting_model_view_transform(painting);
+        paintDl = display_painting_not_rippling(painting);
+
+        gfx = dlist;
+        if (mtxDl != NULL && paintDl != NULL) {
             gSPDisplayList(gfx++, mtxDl);
             gSPDisplayList(gfx++, paintDl);
             gSPPopMatrix(gfx++, G_MTX_MODELVIEW);
-            gSPEndDisplayList(gfx++);
         }
+        gSPEndDisplayList(gfx++);
 
         return dlist;
     }
@@ -1231,7 +1273,7 @@ Gfx *geo_painting_draw(s32 callContext, struct GraphNode *node, UNUSED void *con
     }
 
     if (callContext != GEO_CONTEXT_RENDER) {
-        reset_painting(painting);
+	reset_painting(painting);
     } else if (callContext == GEO_CONTEXT_RENDER) {
         set_painting_layer(gen, painting);
 
