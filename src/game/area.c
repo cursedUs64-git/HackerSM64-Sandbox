@@ -253,9 +253,10 @@ void load_area(s32 index) {
             spawn_objects_from_info(0, gCurrentArea->objectSpawnInfos);
         }
 
+        gCurrentPaintingGroup = get_current_painting_group();
+
         geo_call_global_function_nodes(&gCurrentArea->graphNode->node, GEO_CONTEXT_AREA_LOAD);
 
-        gCurrentPaintingGroup = get_current_painting_group();
         reset_all_paintings();
     }
 }
