@@ -228,6 +228,7 @@ void clear_area_graph_nodes(void) {
             gAreaData[i].graphNode = NULL;
         }
     }
+    gCurrentPaintingGroup = NULL;
 }
 
 void load_area(s32 index) {
@@ -238,6 +239,7 @@ void load_area(s32 index) {
         main_pool_pop_state();
         main_pool_push_state();
 
+	gCurrentPaintingGroup = get_current_painting_group();
         gMarioCurrentRoom = 0;
 
         if (gCurrentArea->surfaceRooms != NULL) {
@@ -253,7 +255,6 @@ void load_area(s32 index) {
             spawn_objects_from_info(0, gCurrentArea->objectSpawnInfos);
         }
 
-        gCurrentPaintingGroup = get_current_painting_group();
 
         geo_call_global_function_nodes(&gCurrentArea->graphNode->node, GEO_CONTEXT_AREA_LOAD);
 
@@ -269,6 +270,7 @@ void unload_area(void) {
 
         gCurrentArea->flags = AREA_FLAG_UNLOAD;
         gCurrentArea = NULL;
+	gCurrentPaintingGroup = get_current_painting_group();
         gWarpTransition.isActive = FALSE;
     }
 }
